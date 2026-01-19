@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "MuthurSwiftUI",
+    name: "muthur",
     platforms: [.macOS(.v14)], // Required for SwiftUI
     targets: [
         .executableTarget(
-            name: "MuthurSwiftUI",
+            name: "muthur",
             path: "Sources"
         ),
     ]
