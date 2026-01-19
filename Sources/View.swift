@@ -42,7 +42,7 @@ struct MuthurTerminal: View {
 
             // Input
             HStack {
-                Text("[MU-TH-UR]>>")
+                Text("[muthur]>>")
                     .foregroundColor(muThUrGreen)
                     .font(.system(.body, design: .monospaced))
 
@@ -75,15 +75,35 @@ struct MuthurTerminal: View {
 
     func processCommand() {
         let input = currentInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let commandKey = input.uppercased()
         guard !input.isEmpty else { return }
 
         consoleLog.append("> \(input)")
 
-        if input == "exit" || input == "quit" {
+        // Intercept built-in and Lore commands
+        switch commandKey {
+        case "HELP":
+            consoleLog.append("""
+            MU-TH-UR 6000 INTERFACE v1.0
+            --------------------------
+            LOCAL COMMANDS:
+            CLEAR - PURGE TERMINAL BUFFER
+            EXIT  - TERMINATE INTERFACE
+            HELP  - DISPLAY THIS DIRECTIVE
+
+            SYSTEM COMMANDS:
+            ANY VALID ZSH COMMAND IS AUTHORIZED.
+            """)
+        case "EXIT", "QUIT":
             NSApplication.shared.terminate(nil)
-        } else if input == "clear" {
+        case "CLEAR":
             consoleLog.removeAll()
-        } else {
+        case "SPECIAL ORDER 937", "ORDER 937":
+            consoleLog.append("PRIORITY ONE. INSURE RETURN OF ORGANISM. ALL OTHER PRIORITIES RESCINDED. CREW EXPENDABLE.")
+        case "CREW STATUS":
+            consoleLog.append("NOSTROMO COMPLEMENT: 07. STATUS: 1 ACTIVE / 6 TERMINATED.")
+        default:
+            // Fall back to standard shell execution
             consoleLog.append(runShell(input))
         }
 
@@ -160,9 +180,10 @@ struct ScanlineOverlay: View {
     var body: some View {
         GeometryReader { geo in
             Path { path in
-                for i in stride(from: 0, to: geo.size.height, by: 3) {
-                    path.move(to: CGPoint(x: 0, y: CGFloat(i)))
-                    path.addLine(to: CGPoint(x: geo.size.width, y: CGFloat(i)))
+                // Using 'lineOffset' to satisfy naming conventions
+                for lineOffset in stride(from: 0, to: geo.size.height, by: 3) {
+                    path.move(to: CGPoint(x: 0, y: CGFloat(lineOffset)))
+                    path.addLine(to: CGPoint(x: geo.size.width, y: CGFloat(lineOffset)))
                 }
             }
             .stroke(Color.black.opacity(0.25), lineWidth: 1)
