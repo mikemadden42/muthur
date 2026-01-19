@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct MuthurTerminal: View {
     @State private var consoleLog: [String] = []
     @State private var currentInput: String = ""
@@ -96,7 +97,8 @@ struct MuthurTerminal: View {
 
         if interactiveTools.contains(cmdBase) {
             // AppleScript Bridge: Spawns a real TTY Terminal for interactive apps
-            let script = "tell application \"Terminal\" to do script \"\(command)\""
+            // Added 'activate' to ensure the new Terminal window pops to the front
+            let script = "tell application \"Terminal\" to (activate) & (do script \"\(command)\")"
             let osascript = Process()
             osascript.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
             osascript.arguments = ["-e", script]
@@ -134,9 +136,18 @@ struct TypewriterText: View {
             .foregroundColor(color)
             .onAppear {
                 Timer.scheduledTimer(withTimeInterval: 0.015, repeats: true) { timer in
-                    if visibleChars < text.count {
-                        visibleChars += 1
-                    } else {
+                    // Use local variable to bridge between MainActor and non-isolated timer closure
+                    var isFinished = false
+
+                    MainActor.assumeIsolated {
+                        if visibleChars < text.count {
+                            visibleChars += 1
+                        }
+                        isFinished = visibleChars >= text.count
+                    }
+
+                    // Invalidate timer outside isolation to avoid data race error
+                    if isFinished {
                         timer.invalidate()
                     }
                 }
