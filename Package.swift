@@ -8,6 +8,6 @@ let package = Package(
         .executableTarget(
             name: "muthur",
             path: "Sources"
-        ),
+        )
     ]
 )
