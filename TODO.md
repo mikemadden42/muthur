@@ -12,6 +12,9 @@
   `.task` modifier for automatic task cancellation when views disappear.
 - [x] **Command Sequentiality:** Implement an `isProcessing` state to prevent
   overlapping command execution and maintain the mainframe aesthetic.
+- [ ] **Real-time Pipe Streaming:** Refactor `runShell` to use `AsyncStream` and
+  `readabilityHandler`. This ensures long-running commands (like `find /`)
+  output data to the UI as it arrives rather than waiting for termination.
 - [ ] **Log Identity Stability:** Implement a `LogEntry` model with stable
   identifiers (UUIDs) to prevent animation re-triggers when the log is modified.
 - [ ] **Shell Environment Loading:** Update `runShell` to use a login shell
@@ -36,7 +39,5 @@
   standard ASCII.
 - [x] **State Management:** Consider moving terminal state (log and input) into
   an `@Observable` View Model as the application grows.
-- [ ] **Pipe Streaming:** Refactor pipe reading to process data chunks as they
-  arrive rather than waiting for command termination (enables `tail -f`).
 - [ ] **Testing Infrastructure:** Establish an XCTest suite to verify
   `MuthurViewModel` logic and command interception.
