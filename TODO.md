@@ -12,10 +12,10 @@
   `.task` modifier for automatic task cancellation when views disappear.
 - [x] **Command Sequentiality:** Implement an `isProcessing` state to prevent
   overlapping command execution and maintain the mainframe aesthetic.
-- [ ] **Real-time Pipe Streaming:** Refactor `runShell` to use `AsyncStream` and
+- [x] **Real-time Pipe Streaming:** Refactor `runShell` to use `AsyncStream` and
   `readabilityHandler`. This ensures long-running commands (like `find /`)
   output data to the UI as it arrives rather than waiting for termination.
-- [ ] **Log Identity Stability:** Implement a `LogEntry` model with stable
+- [x] **Log Identity Stability:** Implement a `LogEntry` model with stable
   identifiers (UUIDs) to prevent animation re-triggers when the log is modified.
 - [ ] **Shell Environment Loading:** Update `runShell` to use a login shell
   environment to ensure user paths (like Homebrew) and aliases are available.

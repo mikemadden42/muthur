@@ -1,19 +1,24 @@
 import Observation
 import SwiftUI
 
+struct LogEntry: Identifiable, Equatable {
+    let id = UUID()
+    let text: String
+}
+
 @Observable
 @MainActor
 class MuthurViewModel {
-    var consoleLog: [String] = []
+    var consoleLog: [LogEntry] = []
     var currentInput: String = ""
     var isProcessing: Bool = false
 
     private let typingSpeed: Double = 0.015
 
     func bootSequence() {
-        consoleLog.append("PRIORITY ONE: INSURE RETURN OF ORGANISM.")
-        consoleLog.append("ALL OTHER PRIORITIES RESCINDED.")
-        consoleLog.append("STANDBY FOR COMMAND...")
+        appendEntry("PRIORITY ONE: INSURE RETURN OF ORGANISM.")
+        appendEntry("ALL OTHER PRIORITIES RESCINDED.")
+        appendEntry("STANDBY FOR COMMAND...")
     }
 
     func processCommand() async {
@@ -22,7 +27,7 @@ class MuthurViewModel {
         guard !input.isEmpty else { return }
 
         isProcessing = true
-        consoleLog.append("> \(input)")
+        appendEntry("> \(input)")
         currentInput = ""
 
         // Intercept built-in and Lore commands
@@ -49,61 +54,90 @@ class MuthurViewModel {
         case "CREW STATUS":
             await appendLinesSequentially("NOSTROMO COMPLEMENT: 07. STATUS: 1 ACTIVE / 6 TERMINATED.")
         default:
-            // Fall back to standard shell execution
-            let result = await runShell(input)
-            await appendLinesSequentially(result)
+            // Fall back to standard shell execution with streaming
+            await runStreamingShell(input)
         }
 
         isProcessing = false
     }
 
+    private func appendEntry(_ text: String) {
+        consoleLog.append(LogEntry(text: text))
+    }
+
     private func appendLinesSequentially(_ text: String) async {
         let lines = text.components(separatedBy: .newlines)
         for line in lines {
-            // Preservation of empty lines for formatting
-            consoleLog.append(line)
-            
-            // Wait for this line to "type out" before showing the next one
-            // This restores the sequential cursor feel
+            appendEntry(line)
             let characterCount = Double(line.count)
             let delay = characterCount * typingSpeed
             try? await Task.sleep(for: .seconds(delay))
         }
     }
 
-    private func runShell(_ command: String) async -> String {
+    private func runStreamingShell(_ command: String) async {
         let interactiveTools = ["vim", "vi", "nano", "python3", "python", "top", "htop", "bash", "zsh"]
         let cmdBase = command.components(separatedBy: " ").first ?? ""
 
         if interactiveTools.contains(cmdBase) {
-            // AppleScript Bridge: Spawns a real TTY Terminal for interactive apps
             let script = "tell application \"Terminal\" to (activate) & (do script \"\(command)\")"
             let osascript = Process()
             osascript.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
             osascript.arguments = ["-e", script]
             try? osascript.run()
-            return "LOG: INTERACTIVE SESSION ROUTED TO EXTERNAL TTY."
+            await appendLinesSequentially("LOG: INTERACTIVE SESSION ROUTED TO EXTERNAL TTY.")
+            return
         }
 
-        return await withCheckedContinuation { continuation in
-            let task = Process()
-            let pipe = Pipe()
-            task.standardOutput = pipe
-            task.standardError = pipe
-            task.arguments = ["-c", command]
-            task.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        let task = Process()
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = pipe
+        task.arguments = ["-c", command]
+        task.executableURL = URL(fileURLWithPath: "/bin/zsh")
 
+        let stream = AsyncStream<String> { continuation in
+            pipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    pipe.fileHandleForReading.readabilityHandler = nil
+                    continuation.finish()
+                } else if let str = String(data: data, encoding: .utf8) {
+                    continuation.yield(str)
+                }
+            }
+            
             task.terminationHandler = { _ in
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let output = String(data: data, encoding: .utf8) ?? ""
-                continuation.resume(returning: output.isEmpty ? "SUCCESS." : output)
+                // Ensure the handler is cleared and stream finished
+                pipe.fileHandleForReading.readabilityHandler = nil
+                continuation.finish()
             }
 
             do {
                 try task.run()
             } catch {
-                continuation.resume(returning: "ERROR: COMMAND FAILED.")
+                continuation.yield("ERROR: COMMAND FAILED.")
+                continuation.finish()
             }
+        }
+
+        var buffer = ""
+        for await chunk in stream {
+            buffer += chunk
+            // If the chunk contains newlines, we can output the completed lines
+            if buffer.contains("\n") {
+                let lines = buffer.components(separatedBy: .newlines)
+                // Append all but the last part (which might be incomplete)
+                for i in 0 ..< lines.count - 1 {
+                    await appendLinesSequentially(lines[i])
+                }
+                buffer = lines.last ?? ""
+            }
+        }
+        
+        // Append any remaining text in the buffer
+        if !buffer.isEmpty {
+            await appendLinesSequentially(buffer)
         }
     }
 }
@@ -132,18 +166,18 @@ struct MuthurTerminal: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(0 ..< viewModel.consoleLog.count, id: \.self) { index in
-                            TypewriterText(text: viewModel.consoleLog[index], color: muThUrGreen)
-                                .id(index)
+                        ForEach(viewModel.consoleLog) { entry in
+                            TypewriterText(text: entry.text, color: muThUrGreen)
+                                .id(entry.id)
                         }
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .onChange(of: viewModel.consoleLog) { _, _ in
-                    if !viewModel.consoleLog.isEmpty {
+                    if let lastId = viewModel.consoleLog.last?.id {
                         withAnimation {
-                            proxy.scrollTo(viewModel.consoleLog.count - 1, anchor: .bottom)
+                            proxy.scrollTo(lastId, anchor: .bottom)
                         }
                     }
                 }
@@ -197,7 +231,6 @@ struct TypewriterText: View {
             .font(.system(.body, design: .monospaced))
             .foregroundColor(color)
             .task {
-                // Ensure we don't double-animate if the view is reused
                 guard visibleText.isEmpty else { return }
                 
                 for index in text.indices {
@@ -213,7 +246,6 @@ struct ScanlineOverlay: View {
     var body: some View {
         GeometryReader { geo in
             Path { path in
-                // Using 'lineOffset' to satisfy naming conventions
                 for lineOffset in stride(from: 0, to: geo.size.height, by: 3) {
                     path.move(to: CGPoint(x: 0, y: CGFloat(lineOffset)))
                     path.addLine(to: CGPoint(x: geo.size.width, y: CGFloat(lineOffset)))
