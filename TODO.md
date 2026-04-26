@@ -26,7 +26,7 @@
   logic.
 - [x] **Multi-line Output Streaming:** Refactor shell output handling to split
   results by line, allowing for more natural scrolling and typing animations.
-- [ ] **Empty Line Preservation:** Update line splitting logic to preserve blank
+- [x] **Empty Line Preservation:** Update line splitting logic to preserve blank
   lines for correct command output formatting and readability.
 
 ## Priority 3: Refinement

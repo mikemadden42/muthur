@@ -8,6 +8,8 @@ class MuthurViewModel {
     var currentInput: String = ""
     var isProcessing: Bool = false
 
+    private let typingSpeed: Double = 0.015
+
     func bootSequence() {
         consoleLog.append("PRIORITY ONE: INSURE RETURN OF ORGANISM.")
         consoleLog.append("ALL OTHER PRIORITIES RESCINDED.")
@@ -37,28 +39,35 @@ class MuthurViewModel {
             SYSTEM COMMANDS:
             ANY VALID ZSH COMMAND IS AUTHORIZED.
             """
-            appendLines(helpText)
+            await appendLinesSequentially(helpText)
         case "EXIT", "QUIT":
             NSApplication.shared.terminate(nil)
         case "CLEAR":
             consoleLog.removeAll()
         case "SPECIAL ORDER 937", "ORDER 937":
-            consoleLog.append("PRIORITY ONE. INSURE RETURN OF ORGANISM. ALL OTHER PRIORITIES RESCINDED. CREW EXPENDABLE.")
+            await appendLinesSequentially("PRIORITY ONE. INSURE RETURN OF ORGANISM. ALL OTHER PRIORITIES RESCINDED. CREW EXPENDABLE.")
         case "CREW STATUS":
-            consoleLog.append("NOSTROMO COMPLEMENT: 07. STATUS: 1 ACTIVE / 6 TERMINATED.")
+            await appendLinesSequentially("NOSTROMO COMPLEMENT: 07. STATUS: 1 ACTIVE / 6 TERMINATED.")
         default:
             // Fall back to standard shell execution
             let result = await runShell(input)
-            appendLines(result)
+            await appendLinesSequentially(result)
         }
 
         isProcessing = false
     }
 
-    private func appendLines(_ text: String) {
+    private func appendLinesSequentially(_ text: String) async {
         let lines = text.components(separatedBy: .newlines)
-        for line in lines where !line.isEmpty {
+        for line in lines {
+            // Preservation of empty lines for formatting
             consoleLog.append(line)
+            
+            // Wait for this line to "type out" before showing the next one
+            // This restores the sequential cursor feel
+            let characterCount = Double(line.count)
+            let delay = characterCount * typingSpeed
+            try? await Task.sleep(for: .seconds(delay))
         }
     }
 
@@ -188,7 +197,9 @@ struct TypewriterText: View {
             .font(.system(.body, design: .monospaced))
             .foregroundColor(color)
             .task {
-                visibleText = ""
+                // Ensure we don't double-animate if the view is reused
+                guard visibleText.isEmpty else { return }
+                
                 for index in text.indices {
                     visibleText.append(text[index])
                     try? await Task.sleep(for: .seconds(0.015))
