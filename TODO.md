@@ -12,6 +12,10 @@
   `.task` modifier for automatic task cancellation when views disappear.
 - [x] **Command Sequentiality:** Implement an `isProcessing` state to prevent
   overlapping command execution and maintain the mainframe aesthetic.
+- [ ] **Log Identity Stability:** Implement a `LogEntry` model with stable
+  identifiers (UUIDs) to prevent animation re-triggers when the log is modified.
+- [ ] **Shell Environment Loading:** Update `runShell` to use a login shell
+  environment to ensure user paths (like Homebrew) and aliases are available.
 
 ## Priority 2: Modernization & API Updates
 
@@ -22,6 +26,8 @@
   logic.
 - [x] **Multi-line Output Streaming:** Refactor shell output handling to split
   results by line, allowing for more natural scrolling and typing animations.
+- [ ] **Empty Line Preservation:** Update line splitting logic to preserve blank
+  lines for correct command output formatting and readability.
 
 ## Priority 3: Refinement
 
@@ -30,5 +36,7 @@
   standard ASCII.
 - [x] **State Management:** Consider moving terminal state (log and input) into
   an `@Observable` View Model as the application grows.
+- [ ] **Pipe Streaming:** Refactor pipe reading to process data chunks as they
+  arrive rather than waiting for command termination (enables `tail -f`).
 - [ ] **Testing Infrastructure:** Establish an XCTest suite to verify
   `MuthurViewModel` logic and command interception.
