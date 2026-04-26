@@ -21,10 +21,10 @@
   typewriter animation. Implement "catch-up" logic to prevent the UI from
   falling too far behind high-volume shell output.
 - [ ] **Process Interrupt Support:** Add a way to terminate a long-running shell
-  process (e.g., a "Kill" button or Esc key) and ensure `isProcessing` is tied
+  process (e.g., using the `Esc` key) and ensure `isProcessing` is tied strictly
   to the process lifecycle.
 - [ ] **Shell Environment Loading:** Update `runShell` to use a login shell
-  environment to ensure user paths (like Homebrew) and aliases are available.
+  environment (`-l`) to ensure user paths (Homebrew) and aliases are available.
 
 ## Priority 2: Modernization & API Updates
 
