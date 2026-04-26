@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// Delegate ensures the process ends when you close the window
+/// Delegate ensures the process ends when you close the window
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool {
         true
