@@ -23,8 +23,11 @@
 - [ ] **Process Interrupt Support:** Add a way to terminate a long-running shell
   process (e.g., using the `Esc` key) and ensure `isProcessing` is tied strictly
   to the process lifecycle.
+- [ ] **Resource Cleanup (Ghost Processes):** Ensure the active shell process is
+  terminated when the application is closed or the view is dismissed to prevent
+  orphan background processes.
 - [ ] **Shell Environment Loading:** Update `runShell` to use a login shell
-  environment (`-l`) to ensure user paths (Homebrew) and aliases are available.
+  environment (`-l`) and verify path loading for Homebrew/common dev tools.
 
 ## Priority 2: Modernization & API Updates
 
@@ -37,6 +40,9 @@
   results by line, allowing for more natural scrolling and typing animations.
 - [x] **Empty Line Preservation:** Update line splitting logic to preserve blank
   lines for correct command output formatting and readability.
+- [ ] **Throttled Auto-Scroll:** Implement a throttled or proximity-based scroll
+  mechanism to prevent UI jitter and CPU spikes during high-frequency log
+  updates.
 
 ## Priority 3: Refinement
 
@@ -45,5 +51,8 @@
   standard ASCII.
 - [x] **State Management:** Consider moving terminal state (log and input) into
   an `@Observable` View Model as the application grows.
+- [ ] **AsyncStream Race Safety:** Ensure `runStreamingShell` performs a final
+  drain of the pipe after process termination to prevent loss of final output
+  chunks.
 - [ ] **Testing Infrastructure:** Establish an XCTest suite to verify
   `MuthurViewModel` logic and command interception.
