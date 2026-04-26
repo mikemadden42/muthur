@@ -22,5 +22,5 @@
 - [x] **Grapheme Cluster Safety:** Refine `TypewriterText` indexing to ensure it
   handles multi-scalar characters safely if the character set expands beyond
   standard ASCII.
-- [ ] **State Management:** Consider moving terminal state (log and input) into
+- [x] **State Management:** Consider moving terminal state (log and input) into
   an `@Observable` View Model as the application grows.

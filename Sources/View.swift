@@ -1,77 +1,11 @@
+import Observation
 import SwiftUI
 
+@Observable
 @MainActor
-struct MuthurTerminal: View {
-    @State private var consoleLog: [String] = []
-    @State private var currentInput: String = ""
-    @FocusState private var isInputFocused: Bool
-
-    let muThUrGreen = Color(red: 0.0, green: 0.8, blue: 0.0)
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            Text("WEYLAND-YUTANI CORP | MU-TH-UR 6000 | NOSTROMO-2037")
-                .font(.system(.subheadline, design: .monospaced))
-                .fontWeight(.bold)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(muThUrGreen)
-                .foregroundColor(.black)
-
-            // Log
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(0 ..< consoleLog.count, id: \.self) { index in
-                            TypewriterText(text: consoleLog[index], color: muThUrGreen)
-                                .id(index)
-                        }
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .onChange(of: consoleLog) { _, _ in
-                    if !consoleLog.isEmpty {
-                        withAnimation {
-                            proxy.scrollTo(consoleLog.count - 1, anchor: .bottom)
-                        }
-                    }
-                }
-            }
-            .background(Color.black)
-            .overlay(ScanlineOverlay())
-
-            // Input
-            HStack {
-                Text("[muthur]>>")
-                    .foregroundColor(muThUrGreen)
-                    .font(.system(.body, design: .monospaced))
-
-                TextField("", text: $currentInput)
-                    .focused($isInputFocused)
-                    .textFieldStyle(.plain)
-                    .foregroundColor(muThUrGreen)
-                    .font(.system(.body, design: .monospaced))
-                    .onSubmit {
-                        Task {
-                            await processCommand()
-                        }
-                    }
-                    .autocorrectionDisabled()
-            }
-            .padding()
-            .background(Color.black)
-            .border(muThUrGreen, width: 1)
-        }
-        .onAppear {
-            bootSequence()
-            isInputFocused = true
-        }
-        .onTapGesture {
-            isInputFocused = true
-        }
-    }
+class MuthurViewModel {
+    var consoleLog: [String] = []
+    var currentInput: String = ""
 
     func bootSequence() {
         consoleLog.append("PRIORITY ONE: INSURE RETURN OF ORGANISM.")
@@ -114,11 +48,9 @@ struct MuthurTerminal: View {
             let result = await runShell(input)
             consoleLog.append(result)
         }
-
-        isInputFocused = true
     }
 
-    func runShell(_ command: String) async -> String {
+    private func runShell(_ command: String) async -> String {
         let interactiveTools = ["vim", "vi", "nano", "python3", "python", "top", "htop", "bash", "zsh"]
         let cmdBase = command.components(separatedBy: " ").first ?? ""
 
@@ -151,6 +83,82 @@ struct MuthurTerminal: View {
             } catch {
                 continuation.resume(returning: "ERROR: COMMAND FAILED.")
             }
+        }
+    }
+}
+
+@MainActor
+struct MuthurTerminal: View {
+    @State private var viewModel = MuthurViewModel()
+    @FocusState private var isInputFocused: Bool
+
+    let muThUrGreen = Color(red: 0.0, green: 0.8, blue: 0.0)
+
+    var body: some View {
+        @Bindable var viewModel = viewModel
+
+        VStack(spacing: 0) {
+            // Header
+            Text("WEYLAND-YUTANI CORP | MU-TH-UR 6000 | NOSTROMO-2037")
+                .font(.system(.subheadline, design: .monospaced))
+                .fontWeight(.bold)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(muThUrGreen)
+                .foregroundColor(.black)
+
+            // Log
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(0 ..< viewModel.consoleLog.count, id: \.self) { index in
+                            TypewriterText(text: viewModel.consoleLog[index], color: muThUrGreen)
+                                .id(index)
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .onChange(of: viewModel.consoleLog) { _, _ in
+                    if !viewModel.consoleLog.isEmpty {
+                        withAnimation {
+                            proxy.scrollTo(viewModel.consoleLog.count - 1, anchor: .bottom)
+                        }
+                    }
+                }
+            }
+            .background(Color.black)
+            .overlay(ScanlineOverlay())
+
+            // Input
+            HStack {
+                Text("[muthur]>>")
+                    .foregroundColor(muThUrGreen)
+                    .font(.system(.body, design: .monospaced))
+
+                TextField("", text: $viewModel.currentInput)
+                    .focused($isInputFocused)
+                    .textFieldStyle(.plain)
+                    .foregroundColor(muThUrGreen)
+                    .font(.system(.body, design: .monospaced))
+                    .onSubmit {
+                        Task {
+                            await viewModel.processCommand()
+                            isInputFocused = true
+                        }
+                    }
+                    .autocorrectionDisabled()
+            }
+            .padding()
+            .background(Color.black)
+            .border(muThUrGreen, width: 1)
+        }
+        .onAppear {
+            viewModel.bootSequence()
+            isInputFocused = true
+        }
+        .onTapGesture {
+            isInputFocused = true
         }
     }
 }
