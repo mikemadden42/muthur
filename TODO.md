@@ -13,13 +13,13 @@
 
 - [x] **Update `onChange` Syntax:** Migrate from the deprecated `.onChange(of:)`
   to the macOS 14+ `.onChange(of:) { oldValue, newValue in }` signature.
-- [ ] **Idiomatic Concurrency:** Replace the manual `Timer` in `TypewriterText`
+- [x] **Idiomatic Concurrency:** Replace the manual `Timer` in `TypewriterText`
   with `Task` and `ContinuousClock` for more modern, Swift 6-aligned animation
   logic.
 
 ## Priority 3: Refinement
 
-- [ ] **Grapheme Cluster Safety:** Refine `TypewriterText` indexing to ensure it
+- [x] **Grapheme Cluster Safety:** Refine `TypewriterText` indexing to ensure it
   handles multi-scalar characters safely if the character set expands beyond
   standard ASCII.
 - [ ] **State Management:** Consider moving terminal state (log and input) into

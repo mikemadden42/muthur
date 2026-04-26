@@ -159,27 +159,17 @@ struct MuthurTerminal: View {
 struct TypewriterText: View {
     let text: String
     let color: Color
-    @State private var visibleChars: Int = 0
+    @State private var visibleText: String = ""
 
     var body: some View {
-        Text(text.prefix(visibleChars))
+        Text(visibleText)
             .font(.system(.body, design: .monospaced))
             .foregroundColor(color)
             .onAppear {
-                Timer.scheduledTimer(withTimeInterval: 0.015, repeats: true) { timer in
-                    // Use local variable to bridge between MainActor and non-isolated timer closure
-                    var isFinished = false
-
-                    MainActor.assumeIsolated {
-                        if visibleChars < text.count {
-                            visibleChars += 1
-                        }
-                        isFinished = visibleChars >= text.count
-                    }
-
-                    // Invalidate timer outside isolation to avoid data race error
-                    if isFinished {
-                        timer.invalidate()
+                Task {
+                    for index in text.indices {
+                        visibleText.append(text[index])
+                        try? await Task.sleep(for: .seconds(0.015))
                     }
                 }
             }
