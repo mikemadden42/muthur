@@ -17,6 +17,12 @@
   output data to the UI as it arrives rather than waiting for termination.
 - [x] **Log Identity Stability:** Implement a `LogEntry` model with stable
   identifiers (UUIDs) to prevent animation re-triggers when the log is modified.
+- [ ] **High-Speed Streaming Catch-up:** Decouple shell reading from the
+  typewriter animation. Implement "catch-up" logic to prevent the UI from
+  falling too far behind high-volume shell output.
+- [ ] **Process Interrupt Support:** Add a way to terminate a long-running shell
+  process (e.g., a "Kill" button or Esc key) and ensure `isProcessing` is tied
+  to the process lifecycle.
 - [ ] **Shell Environment Loading:** Update `runShell` to use a login shell
   environment to ensure user paths (like Homebrew) and aliases are available.
 
