@@ -31,9 +31,11 @@ struct MuthurTerminal: View {
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .onChange(of: consoleLog) {
-                    withAnimation {
-                        proxy.scrollTo(consoleLog.count - 1, anchor: .bottom)
+                .onChange(of: consoleLog) { _, _ in
+                    if !consoleLog.isEmpty {
+                        withAnimation {
+                            proxy.scrollTo(consoleLog.count - 1, anchor: .bottom)
+                        }
                     }
                 }
             }
@@ -51,7 +53,11 @@ struct MuthurTerminal: View {
                     .textFieldStyle(.plain)
                     .foregroundColor(muThUrGreen)
                     .font(.system(.body, design: .monospaced))
-                    .onSubmit(processCommand)
+                    .onSubmit {
+                        Task {
+                            await processCommand()
+                        }
+                    }
                     .autocorrectionDisabled()
             }
             .padding()
@@ -73,12 +79,13 @@ struct MuthurTerminal: View {
         consoleLog.append("STANDBY FOR COMMAND...")
     }
 
-    func processCommand() {
+    func processCommand() async {
         let input = currentInput.trimmingCharacters(in: .whitespacesAndNewlines)
         let commandKey = input.uppercased()
         guard !input.isEmpty else { return }
 
         consoleLog.append("> \(input)")
+        currentInput = ""
 
         // Intercept built-in and Lore commands
         switch commandKey {
@@ -104,20 +111,19 @@ struct MuthurTerminal: View {
             consoleLog.append("NOSTROMO COMPLEMENT: 07. STATUS: 1 ACTIVE / 6 TERMINATED.")
         default:
             // Fall back to standard shell execution
-            consoleLog.append(runShell(input))
+            let result = await runShell(input)
+            consoleLog.append(result)
         }
 
-        currentInput = ""
         isInputFocused = true
     }
 
-    func runShell(_ command: String) -> String {
+    func runShell(_ command: String) async -> String {
         let interactiveTools = ["vim", "vi", "nano", "python3", "python", "top", "htop", "bash", "zsh"]
         let cmdBase = command.components(separatedBy: " ").first ?? ""
 
         if interactiveTools.contains(cmdBase) {
             // AppleScript Bridge: Spawns a real TTY Terminal for interactive apps
-            // Added 'activate' to ensure the new Terminal window pops to the front
             let script = "tell application \"Terminal\" to (activate) & (do script \"\(command)\")"
             let osascript = Process()
             osascript.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
@@ -126,20 +132,25 @@ struct MuthurTerminal: View {
             return "LOG: INTERACTIVE SESSION ROUTED TO EXTERNAL TTY."
         }
 
-        let task = Process()
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = pipe
-        task.arguments = ["-c", command]
-        task.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        return await withCheckedContinuation { continuation in
+            let task = Process()
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            task.standardError = pipe
+            task.arguments = ["-c", command]
+            task.executableURL = URL(fileURLWithPath: "/bin/zsh")
 
-        do {
-            try task.run()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? ""
-            return output.isEmpty ? "SUCCESS." : output
-        } catch {
-            return "ERROR: COMMAND FAILED."
+            task.terminationHandler = { _ in
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: data, encoding: .utf8) ?? ""
+                continuation.resume(returning: output.isEmpty ? "SUCCESS." : output)
+            }
+
+            do {
+                try task.run()
+            } catch {
+                continuation.resume(returning: "ERROR: COMMAND FAILED.")
+            }
         }
     }
 }
