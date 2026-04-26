@@ -6,6 +6,7 @@ import SwiftUI
 class MuthurViewModel {
     var consoleLog: [String] = []
     var currentInput: String = ""
+    var isProcessing: Bool = false
 
     func bootSequence() {
         consoleLog.append("PRIORITY ONE: INSURE RETURN OF ORGANISM.")
@@ -18,13 +19,14 @@ class MuthurViewModel {
         let commandKey = input.uppercased()
         guard !input.isEmpty else { return }
 
+        isProcessing = true
         consoleLog.append("> \(input)")
         currentInput = ""
 
         // Intercept built-in and Lore commands
         switch commandKey {
         case "HELP":
-            consoleLog.append("""
+            let helpText = """
             MU-TH-UR 6000 INTERFACE v1.0
             --------------------------
             LOCAL COMMANDS:
@@ -34,7 +36,8 @@ class MuthurViewModel {
 
             SYSTEM COMMANDS:
             ANY VALID ZSH COMMAND IS AUTHORIZED.
-            """)
+            """
+            appendLines(helpText)
         case "EXIT", "QUIT":
             NSApplication.shared.terminate(nil)
         case "CLEAR":
@@ -46,7 +49,16 @@ class MuthurViewModel {
         default:
             // Fall back to standard shell execution
             let result = await runShell(input)
-            consoleLog.append(result)
+            appendLines(result)
+        }
+
+        isProcessing = false
+    }
+
+    private func appendLines(_ text: String) {
+        let lines = text.components(separatedBy: .newlines)
+        for line in lines where !line.isEmpty {
+            consoleLog.append(line)
         }
     }
 
@@ -133,7 +145,7 @@ struct MuthurTerminal: View {
             // Input
             HStack {
                 Text("[muthur]>>")
-                    .foregroundColor(muThUrGreen)
+                    .foregroundColor(viewModel.isProcessing ? muThUrGreen.opacity(0.5) : muThUrGreen)
                     .font(.system(.body, design: .monospaced))
 
                 TextField("", text: $viewModel.currentInput)
@@ -148,10 +160,12 @@ struct MuthurTerminal: View {
                         }
                     }
                     .autocorrectionDisabled()
+                    .disabled(viewModel.isProcessing)
             }
             .padding()
             .background(Color.black)
             .border(muThUrGreen, width: 1)
+            .opacity(viewModel.isProcessing ? 0.7 : 1.0)
         }
         .onAppear {
             viewModel.bootSequence()
@@ -173,12 +187,11 @@ struct TypewriterText: View {
         Text(visibleText)
             .font(.system(.body, design: .monospaced))
             .foregroundColor(color)
-            .onAppear {
-                Task {
-                    for index in text.indices {
-                        visibleText.append(text[index])
-                        try? await Task.sleep(for: .seconds(0.015))
-                    }
+            .task {
+                visibleText = ""
+                for index in text.indices {
+                    visibleText.append(text[index])
+                    try? await Task.sleep(for: .seconds(0.015))
                 }
             }
     }
