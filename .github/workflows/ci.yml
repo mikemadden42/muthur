@@ -16,13 +16,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # These GitHub-hosted images are already Apple Silicon (arm64); the
+        # "-arm64" suffix is a self-hosted convention and would stall here.
         os:
-          - macOS-26-arm64
           - macOS-26
           - macOS-15
-          - macOS-15-arm64
           - macOS-14
-          - macOS-14-arm64
     steps:
       - uses: actions/checkout@v4
 
