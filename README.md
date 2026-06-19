@@ -51,7 +51,7 @@ are case-insensitive and tolerant of extra whitespace. Try entering:
 * `CREW STATUS` - Personnel manifest.
 * `SPECIAL ORDER 937` (or `ORDER 937`) - [RESTRICTED]
 * `CLEAR` - Purge the terminal buffer.
-* `EXIT` / `QUIT` - Terminate the interface.
+* `EXIT` / `QUIT` - Terminate the interface (or `Ctrl-D` on an empty line).
 
 Any input that is not an intercepted directive is executed as a standard shell
 command (see **Usage** below).

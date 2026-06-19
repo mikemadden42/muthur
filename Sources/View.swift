@@ -71,6 +71,13 @@ class MuthurViewModel {
         activeProcess = nil
     }
 
+    /// Ctrl-D: terminal-style EOF. Logs out only on an empty input line with no
+    /// command running, matching shell behavior, so it can't fire mid-command.
+    func requestEOF() {
+        guard !isProcessing, currentInput.isEmpty else { return }
+        NSApplication.shared.terminate(nil)
+    }
+
     private func handleLoreCommands(_ commandKey: String) async -> Bool {
         switch commandKey {
         case "HELP":
@@ -98,7 +105,7 @@ class MuthurViewModel {
     --------------------------
     LOCAL COMMANDS:
     CLEAR - PURGE TERMINAL BUFFER
-    EXIT  - TERMINATE INTERFACE
+    EXIT  - TERMINATE INTERFACE (OR CTRL-D)
     HELP  - DISPLAY THIS DIRECTIVE
 
     SYSTEM COMMANDS:
@@ -265,6 +272,14 @@ struct MuthurTerminal: View {
                 viewModel.interrupt()
             }
             .keyboardShortcut(.escape, modifiers: [])
+            .opacity(0)
+        )
+        // Ctrl-D logs out (terminal-style EOF) when the input line is empty.
+        .background(
+            Button("Logout") {
+                viewModel.requestEOF()
+            }
+            .keyboardShortcut("d", modifiers: .control)
             .opacity(0)
         )
     }
