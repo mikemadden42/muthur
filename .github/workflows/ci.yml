@@ -43,7 +43,7 @@ jobs:
 
   lint:
     name: Lint & Format
-    runs-on: macOS-14
+    runs-on: macOS-26
     steps:
       - uses: actions/checkout@v4
 
