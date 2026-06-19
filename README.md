@@ -100,3 +100,34 @@ git clone https://github.com/yourusername/muthur.git
 cd muthur
 swift build -c release
 ```
+
+---
+
+## Development
+
+### Tests
+
+```bash
+swift test
+```
+
+### Linting & Formatting
+
+The repo ships a `.swiftlint.yml` and `.swiftformat`; both tools read their
+config automatically. Install via Homebrew (`brew install swiftlint swiftformat`)
+if needed.
+
+```bash
+# Auto-fix formatting in place.
+swiftformat .
+
+# Check only — no files are modified (use these before committing / in CI).
+swiftformat . --lint
+swiftlint
+```
+
+`swiftlint` (no path argument) honours the `included:` paths in the config;
+passing a path overrides them. `swiftformat .` rewrites files in place, so run
+it on a clean tree and review the diff — add `--lint` to check without writing.
+Run all three (`swift test`, `swiftformat . --lint`, `swiftlint`) before
+committing; they should all pass clean.
