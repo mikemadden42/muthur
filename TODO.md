@@ -28,6 +28,21 @@
   orphan background processes.
 - [ ] **Shell Environment Loading:** Update `runShell` to use a login shell
   environment (`-l`) and verify path loading for Homebrew/common dev tools.
+- [ ] **AppleScript Injection / Quoting:** In `runStreamingShell`, the raw
+  command is interpolated directly into the `osascript` string
+  (`do script "\(command)"`). Any command containing a double quote (e.g.
+  `python3 -c "print(1)"`) breaks the script and the route silently misfires.
+  Escape `\` and `"` (or pass the command via argument) before interpolation.
+- [ ] **Decouple Per-Line Sleep from Animation (root cause):** Shell output is
+  currently typed twice — `appendLinesSequentially` sleeps `line.count * speed`
+  *before* appending the next line, while `TypewriterText` *also* animates each
+  entry char-by-char. This serializes large output (e.g. `find /`) and locks
+  input for minutes. The ViewModel should append shell lines immediately and let
+  the view own (or skip) animation. This is the underlying cause of both
+  **High-Speed Streaming Catch-up** and **Throttled Auto-Scroll**.
+- [ ] **Surface Exit Status:** Non-zero exits blend silently into stderr output,
+  and `try? task.run()` / `try? osascript.run()` swallow launch failures. Report
+  the process exit code (and launch errors) to the console buffer.
 
 ## Priority 2: Modernization & API Updates
 
@@ -56,3 +71,22 @@
   chunks.
 - [ ] **Testing Infrastructure:** Establish an XCTest suite to verify
   `MuthurViewModel` logic and command interception.
+- [ ] **Deduplicate Typing Speed:** The `0.015` typing interval is defined both
+  as `typingSpeed` and as a literal inside `TypewriterText`. Share a single
+  source of truth so the two can't drift.
+- [ ] **Robust Lore Command Matching:** `commandKey = input.uppercased()` fails
+  on extra whitespace (`CREW  STATUS`) or trailing arguments. Normalize
+  whitespace before matching the interception table.
+- [ ] **Broaden Interactive Tool Detection:** `interactiveTools` only inspects
+  the first token, so `sudo vim` / `env python3` slip through to the
+  non-interactive path. At minimum document the limitation.
+
+## Priority 4: Project Infrastructure
+
+- [ ] **Continuous Integration:** Add a GitHub Actions workflow running
+  `swift build` and `swift test` on push/PR to catch regressions.
+- [ ] **Split Source Files:** `View.swift` holds the view model, three views,
+  and the scanline overlay. Extract `MuthurViewModel` (and ideally the smaller
+  views) into their own files as the app grows.
+- [ ] **Commit Lint/Format Config:** Commit `.swiftlint.yml` / `.swiftformat` so
+  the style rules referenced in past commits are reproducible.
