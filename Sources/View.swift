@@ -18,6 +18,9 @@ class MuthurViewModel {
     /// Pending shell lines above this count are flushed instantly instead of
     /// typed, so high-volume output (e.g. `find /`) can never lock the UI.
     private let catchUpThreshold = 40
+    /// Scrollback limit. Older lines are dropped so the log can't grow without
+    /// bound and stall rendering during torrential output (e.g. `find ~/src`).
+    private let maxLogEntries = 2000
 
     /// The shell process currently bound to the interface, retained so it can
     /// be interrupted (Esc) or reaped on shutdown. `isProcessing` tracks its
@@ -104,6 +107,9 @@ class MuthurViewModel {
 
     private func appendEntry(_ text: String, animated: Bool = true) {
         consoleLog.append(LogEntry(text: text, animated: animated))
+        if consoleLog.count > maxLogEntries {
+            consoleLog.removeFirst(consoleLog.count - maxLogEntries)
+        }
     }
 
     private func appendLinesSequentially(_ text: String) async {
@@ -184,7 +190,9 @@ class MuthurViewModel {
     private func drainPending(_ pending: inout [String]) async {
         while !pending.isEmpty {
             if wasInterrupted || pending.count > catchUpThreshold {
-                for line in pending { appendEntry(line, animated: false) }
+                // Only the most recent lines can outlast the scrollback cap, so
+                // skip the doomed older ones rather than append-then-trim them.
+                for line in pending.suffix(maxLogEntries) { appendEntry(line, animated: false) }
                 pending.removeAll()
                 return
             }
@@ -274,7 +282,7 @@ struct MuthurTerminal: View {
     private var logView: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
+                LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(viewModel.consoleLog) { entry in
                         TypewriterText(text: entry.text, color: muThUrGreen, animated: entry.animated)
                             .id(entry.id)
@@ -283,11 +291,11 @@ struct MuthurTerminal: View {
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .onChange(of: viewModel.consoleLog) { _, _ in
+            // Observe the count (cheap) rather than the whole array (O(n) compare),
+            // and skip the per-update animation so high-frequency output stays smooth.
+            .onChange(of: viewModel.consoleLog.count) { _, _ in
                 if let lastId = viewModel.consoleLog.last?.id {
-                    withAnimation {
-                        proxy.scrollTo(lastId, anchor: .bottom)
-                    }
+                    proxy.scrollTo(lastId, anchor: .bottom)
                 }
             }
         }

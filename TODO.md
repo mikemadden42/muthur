@@ -55,9 +55,9 @@
   results by line, allowing for more natural scrolling and typing animations.
 - [x] **Empty Line Preservation:** Update line splitting logic to preserve blank
   lines for correct command output formatting and readability.
-- [ ] **Throttled Auto-Scroll:** Implement a throttled or proximity-based scroll
+- [x] **Throttled Auto-Scroll:** Implement a throttled or proximity-based scroll
   mechanism to prevent UI jitter and CPU spikes during high-frequency log
-  updates.
+  updates. (LazyVStack + count-based, non-animated scroll + scrollback cap.)
 
 ## Priority 3: Refinement
 
