@@ -4,6 +4,7 @@ import SwiftUI
 struct LogEntry: Identifiable, Equatable {
     let id = UUID()
     let text: String
+    var animated: Bool = true
 }
 
 @Observable
@@ -14,6 +15,15 @@ class MuthurViewModel {
     var isProcessing: Bool = false
 
     private let typingSpeed: Double = 0.015
+    /// Pending shell lines above this count are flushed instantly instead of
+    /// typed, so high-volume output (e.g. `find /`) can never lock the UI.
+    private let catchUpThreshold = 40
+
+    /// The shell process currently bound to the interface, retained so it can
+    /// be interrupted (Esc) or reaped on shutdown. `isProcessing` tracks its
+    /// lifecycle strictly.
+    private var activeProcess: Process?
+    private var wasInterrupted = false
 
     func bootSequence() {
         appendEntry("PRIORITY ONE: INSURE RETURN OF ORGANISM.")
@@ -23,21 +33,39 @@ class MuthurViewModel {
 
     func processCommand() async {
         let input = currentInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        let commandKey = input.uppercased()
         guard !input.isEmpty else { return }
 
+        // Collapse internal whitespace so `CREW  STATUS` still matches.
+        let commandKey = input
+            .uppercased()
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+
         isProcessing = true
+        defer { isProcessing = false }
+
         appendEntry("> \(input)")
         currentInput = ""
 
-        if await handleLoreCommands(commandKey) {
-            isProcessing = false
-            return
-        }
+        if await handleLoreCommands(commandKey) { return }
 
-        // Fall back to standard shell execution with streaming
+        // Fall back to standard shell execution with streaming.
         await runStreamingShell(input)
-        isProcessing = false
+    }
+
+    /// Operator interrupt (Esc): terminate the active process. Its termination
+    /// handler finishes the stream, unwinding `runStreamingShell` naturally.
+    func interrupt() {
+        guard isProcessing, let process = activeProcess, process.isRunning else { return }
+        wasInterrupted = true
+        process.terminate()
+    }
+
+    /// Reap any running process on view dismissal / app shutdown to prevent
+    /// orphaned background shells.
+    func cleanup() {
+        activeProcess?.terminate()
+        activeProcess = nil
     }
 
     private func handleLoreCommands(_ commandKey: String) async -> Bool {
@@ -74,8 +102,8 @@ class MuthurViewModel {
     ANY VALID ZSH COMMAND IS AUTHORIZED.
     """
 
-    private func appendEntry(_ text: String) {
-        consoleLog.append(LogEntry(text: text))
+    private func appendEntry(_ text: String, animated: Bool = true) {
+        consoleLog.append(LogEntry(text: text, animated: animated))
     }
 
     private func appendLinesSequentially(_ text: String) async {
@@ -93,12 +121,7 @@ class MuthurViewModel {
         let cmdBase = command.components(separatedBy: " ").first ?? ""
 
         if interactiveTools.contains(cmdBase) {
-            let script = "tell application \"Terminal\" to (activate) & (do script \"\(command)\")"
-            let osascript = Process()
-            osascript.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            osascript.arguments = ["-e", script]
-            try? osascript.run()
-            await appendLinesSequentially("LOG: INTERACTIVE SESSION ROUTED TO EXTERNAL TTY.")
+            routeToExternalTTY(command)
             return
         }
 
@@ -106,8 +129,13 @@ class MuthurViewModel {
         let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = pipe
-        task.arguments = ["-c", command]
+        // Login shell so Homebrew / dev-tool paths from .zprofile are loaded.
+        task.arguments = ["-l", "-c", command]
         task.executableURL = URL(fileURLWithPath: "/bin/zsh")
+
+        wasInterrupted = false
+        activeProcess = task
+        defer { activeProcess = nil }
 
         let stream = AsyncStream<String> { continuation in
             pipe.fileHandleForReading.readabilityHandler = { handle in
@@ -128,25 +156,72 @@ class MuthurViewModel {
             do {
                 try task.run()
             } catch {
-                continuation.yield("ERROR: COMMAND FAILED.")
+                continuation.yield("ERROR: COMMAND FAILED — \(error.localizedDescription)")
                 continuation.finish()
             }
         }
 
         var buffer = ""
+        var pending: [String] = []
         for await chunk in stream {
             buffer += chunk
-            if buffer.contains("\n") {
-                let lines = buffer.components(separatedBy: .newlines)
-                for index in 0 ..< lines.count - 1 {
-                    await appendLinesSequentially(lines[index])
-                }
-                buffer = lines.last ?? ""
-            }
+            let parts = buffer.components(separatedBy: "\n")
+            buffer = parts.last ?? ""
+            pending.append(contentsOf: parts.dropLast())
+            await drainPending(&pending)
         }
 
-        if !buffer.isEmpty {
-            await appendLinesSequentially(buffer)
+        // Flush the trailing partial line plus any remaining backlog.
+        if !buffer.isEmpty { pending.append(buffer) }
+        await drainPending(&pending)
+
+        reportTermination(of: task)
+    }
+
+    /// Reveal pending shell lines with the typewriter cadence, but fall back to
+    /// instant rendering whenever we fall too far behind (or are interrupted),
+    /// so the interface stays responsive under high-volume output.
+    private func drainPending(_ pending: inout [String]) async {
+        while !pending.isEmpty {
+            if wasInterrupted || pending.count > catchUpThreshold {
+                for line in pending { appendEntry(line, animated: false) }
+                pending.removeAll()
+                return
+            }
+
+            let line = pending.removeFirst()
+            appendEntry(line, animated: true)
+            try? await Task.sleep(for: .seconds(Double(line.count) * typingSpeed))
+        }
+    }
+
+    private func routeToExternalTTY(_ command: String) {
+        // Escape backslashes first, then quotes, so commands like
+        // `python3 -c "print(1)"` survive interpolation into AppleScript.
+        let escaped = command
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let script = "tell application \"Terminal\" to (activate) & (do script \"\(escaped)\")"
+
+        let osascript = Process()
+        osascript.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        osascript.arguments = ["-e", script]
+        do {
+            try osascript.run()
+            appendEntry("LOG: INTERACTIVE SESSION ROUTED TO EXTERNAL TTY.")
+        } catch {
+            appendEntry("ERROR: UNABLE TO ROUTE INTERACTIVE SESSION — \(error.localizedDescription)")
+        }
+    }
+
+    private func reportTermination(of task: Process) {
+        if wasInterrupted {
+            appendEntry("SIGNAL: PROCESS TERMINATED BY OPERATOR.")
+            return
+        }
+        let status = task.terminationStatus
+        if status != 0 {
+            appendEntry("LOG: PROCESS EXITED WITH STATUS \(status).")
         }
     }
 }
@@ -171,6 +246,19 @@ struct MuthurTerminal: View {
         .onTapGesture {
             isInputFocused = true
         }
+        .onDisappear {
+            viewModel.cleanup()
+        }
+        // Esc interrupts a running process regardless of input focus. A hidden
+        // shortcut button is used because the input field is disabled (and thus
+        // unfocused) while a command is in flight.
+        .background(
+            Button("Interrupt") {
+                viewModel.interrupt()
+            }
+            .keyboardShortcut(.escape, modifiers: [])
+            .opacity(0)
+        )
     }
 
     private var headerView: some View {
@@ -188,7 +276,7 @@ struct MuthurTerminal: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(viewModel.consoleLog) { entry in
-                        TypewriterText(text: entry.text, color: muThUrGreen)
+                        TypewriterText(text: entry.text, color: muThUrGreen, animated: entry.animated)
                             .id(entry.id)
                     }
                 }
@@ -238,6 +326,7 @@ struct MuthurTerminal: View {
 struct TypewriterText: View {
     let text: String
     let color: Color
+    var animated: Bool = true
     @State private var visibleText: String = ""
 
     var body: some View {
@@ -245,6 +334,10 @@ struct TypewriterText: View {
             .font(.system(.body, design: .monospaced))
             .foregroundColor(color)
             .task {
+                guard animated else {
+                    visibleText = text
+                    return
+                }
                 guard visibleText.isEmpty else { return }
 
                 for index in text.indices {

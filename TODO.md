@@ -17,30 +17,30 @@
   output data to the UI as it arrives rather than waiting for termination.
 - [x] **Log Identity Stability:** Implement a `LogEntry` model with stable
   identifiers (UUIDs) to prevent animation re-triggers when the log is modified.
-- [ ] **High-Speed Streaming Catch-up:** Decouple shell reading from the
+- [x] **High-Speed Streaming Catch-up:** Decouple shell reading from the
   typewriter animation. Implement "catch-up" logic to prevent the UI from
   falling too far behind high-volume shell output.
-- [ ] **Process Interrupt Support:** Add a way to terminate a long-running shell
+- [x] **Process Interrupt Support:** Add a way to terminate a long-running shell
   process (e.g., using the `Esc` key) and ensure `isProcessing` is tied strictly
   to the process lifecycle.
-- [ ] **Resource Cleanup (Ghost Processes):** Ensure the active shell process is
+- [x] **Resource Cleanup (Ghost Processes):** Ensure the active shell process is
   terminated when the application is closed or the view is dismissed to prevent
   orphan background processes.
-- [ ] **Shell Environment Loading:** Update `runShell` to use a login shell
+- [x] **Shell Environment Loading:** Update `runShell` to use a login shell
   environment (`-l`) and verify path loading for Homebrew/common dev tools.
-- [ ] **AppleScript Injection / Quoting:** In `runStreamingShell`, the raw
+- [x] **AppleScript Injection / Quoting:** In `runStreamingShell`, the raw
   command is interpolated directly into the `osascript` string
   (`do script "\(command)"`). Any command containing a double quote (e.g.
   `python3 -c "print(1)"`) breaks the script and the route silently misfires.
   Escape `\` and `"` (or pass the command via argument) before interpolation.
-- [ ] **Decouple Per-Line Sleep from Animation (root cause):** Shell output is
+- [x] **Decouple Per-Line Sleep from Animation (root cause):** Shell output is
   currently typed twice — `appendLinesSequentially` sleeps `line.count * speed`
   *before* appending the next line, while `TypewriterText` *also* animates each
   entry char-by-char. This serializes large output (e.g. `find /`) and locks
   input for minutes. The ViewModel should append shell lines immediately and let
   the view own (or skip) animation. This is the underlying cause of both
   **High-Speed Streaming Catch-up** and **Throttled Auto-Scroll**.
-- [ ] **Surface Exit Status:** Non-zero exits blend silently into stderr output,
+- [x] **Surface Exit Status:** Non-zero exits blend silently into stderr output,
   and `try? task.run()` / `try? osascript.run()` swallow launch failures. Report
   the process exit code (and launch errors) to the console buffer.
 
@@ -74,7 +74,7 @@
 - [ ] **Deduplicate Typing Speed:** The `0.015` typing interval is defined both
   as `typingSpeed` and as a literal inside `TypewriterText`. Share a single
   source of truth so the two can't drift.
-- [ ] **Robust Lore Command Matching:** `commandKey = input.uppercased()` fails
+- [x] **Robust Lore Command Matching:** `commandKey = input.uppercased()` fails
   on extra whitespace (`CREW  STATUS`) or trailing arguments. Normalize
   whitespace before matching the interception table.
 - [ ] **Broaden Interactive Tool Detection:** `interactiveTools` only inspects
