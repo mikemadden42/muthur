@@ -44,12 +44,43 @@ MU-TH-UR 6000 system.
 
 ## Classified Directives
 
-Authorized personnel may query the mainframe for internal directives. Try
-entering:
+Authorized personnel may query the mainframe for internal directives. Commands
+are case-insensitive and tolerant of extra whitespace. Try entering:
 
 * `HELP` - System diagnostics.
 * `CREW STATUS` - Personnel manifest.
-* `SPECIAL ORDER 937` - [RESTRICTED]
+* `SPECIAL ORDER 937` (or `ORDER 937`) - [RESTRICTED]
+* `CLEAR` - Purge the terminal buffer.
+* `EXIT` / `QUIT` - Terminate the interface.
+
+Any input that is not an intercepted directive is executed as a standard shell
+command (see **Usage** below).
+
+---
+
+## Usage
+
+Anything that isn't a classified directive is dispatched to a login `zsh`
+shell, so your `PATH` (Homebrew, dev tools, etc.) is loaded as usual. The
+interface is built for real workloads:
+
+* **Live streaming:** Output is rendered with the typewriter engine as it
+  arrives. High-volume commands (e.g. `find ~/src`) automatically switch to a
+  "catch-up" mode that flushes the backlog instantly rather than locking the
+  UI.
+* **Scrollback cap:** The console retains the most recent 2,000 lines. The
+  command still runs to completion — older lines simply scroll off. Redirect to
+  a file (`find ~/src > /tmp/out.txt`) if you need the full record.
+* **Interrupt:** Press `Esc` to terminate a running process. The mainframe logs
+  `SIGNAL: PROCESS TERMINATED BY OPERATOR.`
+* **Exit status:** A non-zero exit code is reported as
+  `LOG: PROCESS EXITED WITH STATUS <n>.`
+* **External TTY routing:** Interactive tools (`vim`, `vi`, `nano`, `python3`,
+  `python`, `top`, `htop`, `bash`, `zsh`) are routed to a new macOS Terminal
+  window via the `osascript` bridge — e.g. `python3 -c "print(1)"` opens an
+  external session.
+* **Resource cleanup:** Closing the window terminates any active process, so no
+  orphaned shells are left behind.
 
 ---
 
