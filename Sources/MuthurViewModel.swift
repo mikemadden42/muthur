@@ -193,34 +193,11 @@ class MuthurViewModel {
             return
         }
 
-        let stream = AsyncStream<String> { continuation in
-            pipe.fileHandleForReading.readabilityHandler = { handle in
-                let data = handle.availableData
-                if data.isEmpty {
-                    pipe.fileHandleForReading.readabilityHandler = nil
-                    continuation.finish()
-                } else if let str = String(data: data, encoding: .utf8) {
-                    continuation.yield(str)
-                }
-            }
-
-            // Safety net: if termination fires before the EOF callback, finish
-            // the stream so the loop below can't hang. Both handlers nil the
-            // readability handler before finishing, so the post-loop drain below
-            // never races a live reader.
-            task.terminationHandler = { _ in
-                pipe.fileHandleForReading.readabilityHandler = nil
-                continuation.finish()
-            }
-        }
-
         var buffer = ""
         var pending: [String] = []
-        for await chunk in stream {
+        for await chunk in makeOutputStream(for: task, pipe: pipe) {
             buffer += chunk
-            let parts = buffer.components(separatedBy: "\n")
-            buffer = parts.last ?? ""
-            pending.append(contentsOf: parts.dropLast())
+            absorb(&buffer, into: &pending)
             await drainPending(&pending)
         }
 
@@ -231,9 +208,7 @@ class MuthurViewModel {
         let remaining = pipe.fileHandleForReading.readDataToEndOfFile()
         if let tail = String(data: remaining, encoding: .utf8), !tail.isEmpty {
             buffer += tail
-            let parts = buffer.components(separatedBy: "\n")
-            buffer = parts.last ?? ""
-            pending.append(contentsOf: parts.dropLast())
+            absorb(&buffer, into: &pending)
         }
 
         // Flush the trailing partial line plus any remaining backlog.
@@ -241,6 +216,37 @@ class MuthurViewModel {
         await drainPending(&pending)
 
         reportTermination(of: task)
+    }
+
+    /// Bridge the process pipe to an `AsyncStream` of decoded chunks. Either the
+    /// EOF callback (empty data) or the termination safety net finishes the
+    /// stream; both nil the readability handler first so the caller's post-loop
+    /// drain never races a live reader.
+    private func makeOutputStream(for task: Process, pipe: Pipe) -> AsyncStream<String> {
+        AsyncStream<String> { continuation in
+            pipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                if data.isEmpty {
+                    pipe.fileHandleForReading.readabilityHandler = nil
+                    continuation.finish()
+                } else if let str = String(data: data, encoding: .utf8) {
+                    continuation.yield(str)
+                }
+            }
+
+            task.terminationHandler = { _ in
+                pipe.fileHandleForReading.readabilityHandler = nil
+                continuation.finish()
+            }
+        }
+    }
+
+    /// Move complete lines out of `buffer` into `pending`, leaving any trailing
+    /// partial line in `buffer` for the next chunk.
+    private func absorb(_ buffer: inout String, into pending: inout [String]) {
+        let parts = buffer.components(separatedBy: "\n")
+        buffer = parts.last ?? ""
+        pending.append(contentsOf: parts.dropLast())
     }
 
     /// Reveal pending shell lines with the typewriter cadence, but fall back to
@@ -292,150 +298,5 @@ class MuthurViewModel {
         if status != 0 {
             appendEntry("LOG: PROCESS EXITED WITH STATUS \(status).")
         }
-    }
-}
-
-@MainActor
-struct MuthurTerminal: View {
-    @State private var viewModel = MuthurViewModel()
-    @FocusState private var isInputFocused: Bool
-
-    let muThUrGreen = Color(red: 0.0, green: 0.8, blue: 0.0)
-
-    var body: some View {
-        VStack(spacing: 0) {
-            headerView
-            logView
-            inputView
-        }
-        .onAppear {
-            viewModel.bootSequence()
-            isInputFocused = true
-        }
-        .onTapGesture {
-            isInputFocused = true
-        }
-        .onDisappear {
-            viewModel.cleanup()
-        }
-        // Esc interrupts a running process regardless of input focus. A hidden
-        // shortcut button is used because the input field is disabled (and thus
-        // unfocused) while a command is in flight.
-        .background(
-            Button("Interrupt") {
-                viewModel.interrupt()
-            }
-            .keyboardShortcut(.escape, modifiers: [])
-            .opacity(0)
-        )
-        // Ctrl-D logs out (terminal-style EOF) when the input line is empty.
-        .background(
-            Button("Logout") {
-                viewModel.requestEOF()
-            }
-            .keyboardShortcut("d", modifiers: .control)
-            .opacity(0)
-        )
-    }
-
-    private var headerView: some View {
-        Text("WEYLAND-YUTANI CORP | MU-TH-UR 6000 | NOSTROMO-2037")
-            .font(.system(.subheadline, design: .monospaced))
-            .fontWeight(.bold)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(muThUrGreen)
-            .foregroundColor(.black)
-    }
-
-    private var logView: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(viewModel.consoleLog) { entry in
-                        TypewriterText(text: entry.text, color: muThUrGreen, animated: entry.animated)
-                            .id(entry.id)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            // Observe the count (cheap) rather than the whole array (O(n) compare),
-            // and skip the per-update animation so high-frequency output stays smooth.
-            .onChange(of: viewModel.consoleLog.count) { _, _ in
-                if let lastId = viewModel.consoleLog.last?.id {
-                    proxy.scrollTo(lastId, anchor: .bottom)
-                }
-            }
-        }
-        .background(Color.black)
-        .overlay(ScanlineOverlay())
-    }
-
-    private var inputView: some View {
-        @Bindable var viewModel = viewModel
-        return HStack {
-            Text("[muthur]>>")
-                .foregroundColor(viewModel.isProcessing ? muThUrGreen.opacity(0.5) : muThUrGreen)
-                .font(.system(.body, design: .monospaced))
-
-            TextField("", text: $viewModel.currentInput)
-                .focused($isInputFocused)
-                .textFieldStyle(.plain)
-                .foregroundColor(muThUrGreen)
-                .font(.system(.body, design: .monospaced))
-                .onSubmit {
-                    Task {
-                        await viewModel.processCommand()
-                        isInputFocused = true
-                    }
-                }
-                .autocorrectionDisabled()
-                .disabled(viewModel.isProcessing)
-        }
-        .padding()
-        .background(Color.black)
-        .border(muThUrGreen, width: 1)
-        .opacity(viewModel.isProcessing ? 0.7 : 1.0)
-    }
-}
-
-struct TypewriterText: View {
-    let text: String
-    let color: Color
-    var animated: Bool = true
-    @State private var visibleText: String = ""
-
-    var body: some View {
-        Text(visibleText)
-            .font(.system(.body, design: .monospaced))
-            .foregroundColor(color)
-            .task {
-                guard animated else {
-                    visibleText = text
-                    return
-                }
-                guard visibleText.isEmpty else { return }
-
-                for index in text.indices {
-                    visibleText.append(text[index])
-                    try? await Task.sleep(for: .seconds(TerminalMetrics.typingSpeed))
-                }
-            }
-    }
-}
-
-struct ScanlineOverlay: View {
-    var body: some View {
-        GeometryReader { geo in
-            Path { path in
-                for lineOffset in stride(from: 0, to: geo.size.height, by: 3) {
-                    path.move(to: CGPoint(x: 0, y: CGFloat(lineOffset)))
-                    path.addLine(to: CGPoint(x: geo.size.width, y: CGFloat(lineOffset)))
-                }
-            }
-            .stroke(Color.black.opacity(0.25), lineWidth: 1)
-        }
-        .allowsHitTesting(false)
     }
 }

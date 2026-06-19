@@ -85,7 +85,7 @@
 
 - [ ] **Continuous Integration:** Add a GitHub Actions workflow running
   `swift build` and `swift test` on push/PR to catch regressions.
-- [ ] **Split Source Files:** `View.swift` holds the view model, three views,
+- [x] **Split Source Files:** `View.swift` holds the view model, three views,
   and the scanline overlay. Extract `MuthurViewModel` (and ideally the smaller
   views) into their own files as the app grows.
 - [x] **Commit Lint/Format Config:** Commit `.swiftlint.yml` / `.swiftformat` so
