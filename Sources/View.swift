@@ -251,7 +251,9 @@ class MuthurViewModel {
             if wasInterrupted || pending.count > catchUpThreshold {
                 // Only the most recent lines can outlast the scrollback cap, so
                 // skip the doomed older ones rather than append-then-trim them.
-                for line in pending.suffix(maxLogEntries) { appendEntry(line, animated: false) }
+                for line in pending.suffix(maxLogEntries) {
+                    appendEntry(line, animated: false)
+                }
                 pending.removeAll()
                 return
             }

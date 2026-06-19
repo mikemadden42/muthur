@@ -1,0 +1,27 @@
+# SwiftLint configuration for muthur
+# Run: swiftlint
+
+included:
+  - Sources
+  - Tests
+
+excluded:
+  - .build
+
+disabled_rules:
+  # SwiftFormat owns trailing commas (it adds them to multiline collection
+  # literals); disable here so the two tools don't fight.
+  - trailing_comma
+
+identifier_name:
+  excluded:
+    - id
+    - vm # idiomatic short name for the view model under test
+
+# Slightly above current peaks; still flags genuine bloat. Splitting View.swift
+# (see TODO Priority 4) would bring these comfortably back under defaults.
+file_length:
+  warning: 500
+
+function_body_length:
+  warning: 60

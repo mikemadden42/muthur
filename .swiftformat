@@ -1,0 +1,8 @@
+# SwiftFormat configuration for muthur
+# Run:  swiftformat .
+# Check: swiftformat . --lint
+
+--swiftversion 6.0
+
+# Keep build artifacts out of formatting.
+--exclude .build
