@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macOS-26-arm64
+          - macOS-26
+          - macOS-15
+          - macOS-15-arm64
+          - macOS-14
+          - macOS-14-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pick the newest stable Xcode on each image so Swift 6 is available
+      # regardless of the runner's default toolchain.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+  lint:
+    name: Lint & Format
+    runs-on: macOS-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: brew install swiftlint swiftformat
+
+      - name: SwiftFormat (check only)
+        run: swiftformat . --lint
+
+      - name: SwiftLint
+        run: swiftlint --strict

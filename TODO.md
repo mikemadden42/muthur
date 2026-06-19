@@ -83,7 +83,7 @@
 
 ## Priority 4: Project Infrastructure
 
-- [ ] **Continuous Integration:** Add a GitHub Actions workflow running
+- [x] **Continuous Integration:** Add a GitHub Actions workflow running
   `swift build` and `swift test` on push/PR to catch regressions.
 - [x] **Split Source Files:** `View.swift` holds the view model, three views,
   and the scanline overlay. Extract `MuthurViewModel` (and ideally the smaller
