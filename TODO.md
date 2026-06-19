@@ -66,18 +66,18 @@
   standard ASCII.
 - [x] **State Management:** Consider moving terminal state (log and input) into
   an `@Observable` View Model as the application grows.
-- [ ] **AsyncStream Race Safety:** Ensure `runStreamingShell` performs a final
+- [x] **AsyncStream Race Safety:** Ensure `runStreamingShell` performs a final
   drain of the pipe after process termination to prevent loss of final output
   chunks.
-- [ ] **Testing Infrastructure:** Establish an XCTest suite to verify
+- [x] **Testing Infrastructure:** Establish an XCTest suite to verify
   `MuthurViewModel` logic and command interception.
-- [ ] **Deduplicate Typing Speed:** The `0.015` typing interval is defined both
+- [x] **Deduplicate Typing Speed:** The `0.015` typing interval is defined both
   as `typingSpeed` and as a literal inside `TypewriterText`. Share a single
   source of truth so the two can't drift.
 - [x] **Robust Lore Command Matching:** `commandKey = input.uppercased()` fails
   on extra whitespace (`CREW  STATUS`) or trailing arguments. Normalize
   whitespace before matching the interception table.
-- [ ] **Broaden Interactive Tool Detection:** `interactiveTools` only inspects
+- [x] **Broaden Interactive Tool Detection:** `interactiveTools` only inspects
   the first token, so `sudo vim` / `env python3` slip through to the
   non-interactive path. At minimum document the limitation.
 

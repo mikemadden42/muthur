@@ -9,5 +9,10 @@ let package = Package(
             name: "muthur",
             path: "Sources"
         ),
+        .testTarget(
+            name: "muthurTests",
+            dependencies: ["muthur"],
+            path: "Tests"
+        ),
     ]
 )
